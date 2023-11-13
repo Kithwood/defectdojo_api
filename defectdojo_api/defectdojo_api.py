@@ -1,50 +1,38 @@
 import json
 import requests
 import requests.exceptions
-import requests.packages.urllib3
+import urllib3
 import logging
 
-requests.packages.urllib3.add_stderr_logger()
+import defectdojo_enums
+from defectdojo_request import DefectDojoRequest
+from defectdojo_user import DefectDojoUser
+from defectdojo_engagement import DefectDojoEngagement
 
-version = "1.2.0."
+urllib3.add_stderr_logger()
+
+version = "2023.08.22"
 
 LOGGER_NAME = "defectdojo_api"
 
-class DefectDojoAPIv2(object):
+class DefectDojoAPI(object):
     """An API wrapper for DefectDojo."""
-
-    def __init__(self, host, api_token, user, api_version='v2', verify_ssl=True, timeout=60, proxies=None, user_agent=None, cert=None, debug=False):
-        """Initialize a DefectDojo API instance.
-
-        :param host: The URL for the DefectDojo server. (e.g., http://localhost:8000/DefectDojo/)
-        :param api_token: The API token generated on the DefectDojo API key page.
-        :param user: The user associated with the API key.
-        :param api_version: API version to call, the default is v2.
-        :param verify_ssl: Specify if API requests will verify the host's SSL certificate, defaults to true.
-        :param timeout: HTTP timeout in seconds, default is 30.
-        :param proxis: Proxy for API requests.
-        :param user_agent: HTTP user agent string, default is "DefectDojo_api/[version]".
-        :param cert: You can also specify a local cert to use as client side certificate, as a single file (containing
-        the private key and the certificate) or as a tuple of both file's path
-        :param debug: Prints requests and responses, useful for debugging.
-
+    _defectdojo_request = None
+    def __init__(self :object, host :str, api_token :str, user :str, api_version :str ='v2', 
+                 verify_ssl :bool =True, timeout :int =60, proxies :dict =None, 
+                 user_agent :str =None, cert :str =None, debug :bool =False):
+        """ Initializes the DefectDojo API object
+        :param host: str, url to the defect dojo instance where the api is served
+        :param api_token: str, token to authorize access to the API
+        :param user: str, username to authorize access to the API
+        :param api_version: (Optional) str, major API version that the user is requesting access to
+        :param verify_ssl: (Optional) bool, disables SSL warning messages if False
+        :param timeout: (Optional) int, the number of seconds until calls timeout
+        :param proxies: (Optional) dict, proxies to use in the calls
+        :param user_agent: (Optional) str, passed as the user agent to the underlying https calls
+        :param cert: (Optional) str, SSL certificate used to access the api server
+        :param debug: (Optional) bool, sets logging level to DEBUG instead of WARNING
         """
-
-        self.host = host + '/api/' + api_version + '/'
-        self.api_token = api_token
-        self.user = user
-        self.api_version = api_version
-        self.verify_ssl = verify_ssl
-        self.proxies = proxies
-        self.timeout = timeout
-
-        if not user_agent:
-            self.user_agent = 'DefectDojo_api/' + version
-        else:
-            self.user_agent = user_agent
-
-        self.cert = cert
-
         self.logger = logging.getLogger(LOGGER_NAME)
         self.logger.setLevel(logging.DEBUG)
         if not debug:
@@ -53,293 +41,45 @@ class DefectDojoAPIv2(object):
             logging.getLogger("urllib3").setLevel(logging.WARNING)
             self.logger.setLevel(logging.WARNING)
 
-        if not self.verify_ssl:
-            requests.packages.urllib3.disable_warnings()  # Disabling SSL warning messages if verification is disabled.
+        self._defectdojo_request = DefectDojoRequest(version, host, api_token, user, api_version, verify_ssl, proxies, user_agent, timeout, cert, LOGGER_NAME)
+        self.User = DefectDojoUser(self._defectdojo_request)
+        self.Engagement = DefectDojoEngagement(self._defectdojo_request)
 
-    def version_url(self):
+    def version_url(self :object):
         """Returns the DefectDojo API version.
 
         """
         return self.api_version
 
-    def get_id_from_url(self, url):
+    def get_id_from_url(self :object, url :str):
         """Returns the ID from the DefectDojo API.
 
         :param url: URL returned by the API
-
         """
         url = url.split('/')
         return url[len(url)-2]
 
-
-    ###### User API #######
-    def list_users(self, username=None, limit=20):
-        """Retrieves all the users.
-
-        :param username: Search by username.
-        :param limit: Number of records to return.
-
-        """
-        params  = {}
-        if limit:
-            params['limit'] = limit
-
-        if username:
-            params['username'] = username
-
-        return self._request('GET', 'users/', params)
-
-    def get_user(self, user_id):
-        """Retrieves a user using the given user id.
-
-        :param user_id: User identification.
-
-        """
-        return self._request('GET', 'users/' + str(user_id) + '/')
-
-    def patch_user(self, user_id,data):
-        """modifies a user using the given user id.
-
-        :param user_id: User identification.
-
-        """
-        return self._request('PATCH', 'users/' + str(user_id) + '/', data=data)
-    
-    def get_user_api_key(self,username, password):
+    def get_user_api_key(self :object, username :str, password :str):
         """Retrieves the user API key 
             is useful to import reports and findings from other tools, 
             since findings owner in API are set to the user calling the API
+        :param username: str, username of the user for whom to retrieve the API key
+        :param password: str, password of the user
         """
         data = {
             'username': username,
             'password': password
         }
-        return self._request('POST', 'api-token-auth/', data=data)
-
-
-    ###### Engagements API #######
-    def list_engagements(self, status=None, product_id=None, name_contains=None, name=None, limit=20, offset=0, related_fields=False):
-        """Retrieves all the engagements.
-
-        :param product_in: List of product ids (1,2).
-        :param name_contains: Engagement name
-        :param limit: Number of records to return.
-        :param offset: The initial index from which to return the result
-
-        """
-
-        params  = {}
-        if limit:
-            params['limit'] = limit
-
-        if offset:
-            params['offset'] = offset
-
-        if product_id:
-            params['product'] = product_id
-
-        if status:
-            params['status'] = status
-
-        if related_fields:
-            params['related_fields'] = 'true'
-
-        # TODO remove name_contains here, or add to Defect Dojo. Currently it does nothing
-        if name_contains:
-             params['name_contains'] = name_contains
-
-        if name:
-            params['name'] = name
-
-        return self._request('GET', 'engagements/', params)
-
-    def get_engagement(self, engagement_id):
-        """Retrieves an engagement using the given engagement id.
-
-        :param engagement_id: Engagement identification.
-
-        """
-        return self._request('GET', 'engagements/' + str(engagement_id) + '/')
-
-    def create_engagement(self, name, product_id, lead_id, status, target_start, target_end, active='True',
-        pen_test='False', check_list='False', threat_model='False', risk_path="",test_strategy="", progress="",
-        done_testing='False', engagement_type="CI/CD", build_id=None, commit_hash=None, branch_tag=None, build_server=None,
-        source_code_management_server=None, source_code_management_uri=None, orchestration_engine=None, description=None, deduplication_on_engagement=True):
-        """Creates an engagement with the given properties.
-
-        :param name: Engagement name.
-        :param product_id: Product key id..
-        :param lead_id: Testing lead from the user table.
-        :param status: Engagement Status: In Progress, On Hold, Completed.
-        :param target_start: Engagement start date.
-        :param target_end: Engagement end date.
-        :param active: Active
-        :param pen_test: Pen test for engagement.
-        :param check_list: Check list for engagement.
-        :param threat_model: Thread Model for engagement.
-        :param risk_path: risk_path
-        :param test_strategy: Test Strategy URLs
-        :param progress: Engagement progresss measured in percent.
-        :param engagement_type: Interactive or CI/CD
-        :param build_id: Build id from the build server
-        :param commit_hash: Commit hash from source code management
-        :param branch_tag: Branch or tag from source code management
-        :param build_server: Tool Configuration id of build server
-        :param source_code_management_server: URL of source code management
-        :param source_code_management_uri: Link to source code commit
-        :param orchestration_engine: URL of orchestration engine
-        :param deduplication_on_engagement: voolean value for deduplication_on_engagement
-
-        """
-
-        data = {
-            'name': name,
-            'product': product_id,
-            'lead': lead_id,
-            'status': status,
-            'target_start': target_start,
-            'target_end': target_end,
-            'active': active,
-            'pen_test': pen_test,
-            'check_list': check_list,
-            'threat_model': threat_model,
-            'risk_path': risk_path,
-            'test_strategy': test_strategy,
-            'progress': progress,
-            'done_testing': done_testing,
-            'engagement_type': engagement_type
-        }
-
-        if description:
-            data.update({'description': description})
-
-        if build_id:
-            data.update({'build_id': build_id})
-
-        if commit_hash:
-            data.update({'commit_hash': commit_hash})
-
-        if branch_tag:
-            data.update({'branch_tag': branch_tag})
-
-        if build_server:
-            data.update({'build_server': build_server})
-
-        if source_code_management_server:
-            data.update({'source_code_management_server': source_code_management_server})
-
-        if source_code_management_uri:
-            data.update({'source_code_management_uri': source_code_management_uri})
-
-        if orchestration_engine:
-            data.update({'orchestration_engine': orchestration_engine})
-
-        if deduplication_on_engagement:
-            data.update({'deduplication_on_engagement': deduplication_on_engagement})
-
-        return self._request('POST', 'engagements/', data=data)
-
-    def close_engagement(self, id, user_id=None):
-
-        """Closes an engagement with the given properties.
-        :param id: Engagement id.
-        :param user_id: User from the user table.
-        """
-
-        self.set_engagement(id, status="Completed", active=False)
-
-    def set_engagement(self, id, product_id=None, lead_id=None, name=None, status=None, target_start=None,
-        target_end=None, active=None, pen_test=None, check_list=None, threat_model=None, risk_path=None,
-        test_strategy=None, progress=None, done_testing=None, engagement_type="CI/CD", build_id=None, commit_hash=None, branch_tag=None, build_server=None,
-        source_code_management_server=None, source_code_management_uri=None, orchestration_engine=None, description=None):
-
-        """Updates an engagement with the given properties.
-
-        :param id: Engagement id.
-        :param name: Engagement name.
-        :param product_id: Product key id..
-        :param lead_id: Testing lead from the user table.
-        :param status: Engagement Status: In Progress, On Hold, Completed.
-        :param target_start: Engagement start date.
-        :param target_end: Engagement end date.
-        :param active: Active
-        :param pen_test: Pen test for engagement.
-        :param check_list: Check list for engagement.
-        :param threat_model: Thread Model for engagement.
-        :param risk_path: risk_path
-        :param test_strategy: Test Strategy URLs
-        :param progress: Engagement progresss measured in percent.
-        :param engagement_type: Interactive or CI/CD
-        :param build_id: Build id from the build server
-        :param commit_hash: Commit hash from source code management
-        :param branch_tag: Branch or tag from source code management
-        :param build_server: Tool Configuration id of build server
-        :param source_code_management_server: URL of source code management
-        :param source_code_management_uri: Link to source code commit
-        :param orchestration_engine: URL of orchestration engine
-        """
-
-        data = {}
-
-        if name:
-            data['name'] = name
-
-        if product_id:
-            data['product'] = product_id
-
-        if lead_id:
-            data['lead'] = lead_id
-
-        if status:
-            data['status'] = status
-
-        if target_start:
-            data['target_start'] = target_start
-
-        if target_end:
-            data['target_end'] = target_end
-
-        if active is not None:
-            data['active'] = active
-
-        if pen_test:
-            data['pen_test'] = pen_test
-
-        if check_list:
-            data['check_list'] = check_list
-
-        if threat_model:
-            data['threat_model'] = threat_model
-
-        if risk_path:
-            data['risk_path'] = risk_path
-
-        if test_strategy:
-            data['test_strategy'] = test_strategy
-
-        if progress:
-            data['progress'] = progress
-
-        if done_testing:
-            data['done_testing'] = done_testing
-
-        if build_id:
-            data['build_id'] = build_id
-
-        if commit_hash:
-            data['commit_hash'] = commit_hash
-
-        if description:
-            data['description'] = description
-
-        return self._request('PATCH', 'engagements/' + str(id) + '/', data=data)
+        return self._defectdojo_request.request('POST', 'api-token-auth/', data=data)
 
     ###### Product API #######
-    def set_product_metadata(self, product_id, name=None, value=None):
+    ##### ALL BELOW WILL MOVE TO PRODUCT OBJECT
+    def set_product_metadata(self :object, product_id :int, name :str =None, value :str =None):
         """Add a custom field to a product.
 
-        :param product_id: Product ID.
-        :param meta_data: name/value array.
+        :param product_id: int, Product ID.
+        :param name: (Optional) str, name for the metadata to set
+        :param value: (Optional) str, value for the metdata to set
 
         """
         data = {
@@ -351,14 +91,13 @@ class DefectDojoAPIv2(object):
             'product_id': '{}'.format(product_id)
         }
 
-        return self._request('POST', 'metadata/', data=data, custom_headers=headers)
+        return self._defectdojo_request.request('POST', 'metadata/', data=data, custom_headers=headers)
 
-    def list_products(self, name=None, name_contains=None, limit=200, offset=0, related_fields=False):
+    def list_products(self, name=None, limit=200, offset=0):
 
         """Retrieves all the products.
 
         :param name: Search by product name.
-        :param name_contains: Search by product name.
         :param limit: Number of records to return.
         :param offset: The initial index from which to return the results.
 
@@ -374,12 +113,8 @@ class DefectDojoAPIv2(object):
         if name:
             params['name'] = name
 
-        if name_contains:
-            params['name__icontains'] = name_contains
-        if related_fields:
-            params['related_fields'] = 'true'
 
-        return self._request('GET', 'products/', params)
+        return self._defectdojo_request.request('GET', 'products/', params)
 
     def get_product(self, product_id):
         """Retrieves a product using the given product id.
@@ -387,13 +122,13 @@ class DefectDojoAPIv2(object):
         :param product_id: Product identification.
 
         """
-        return self._request('GET', 'products/' + str(product_id) + '/')
+        return self._defectdojo_request.request('GET', 'products/' + str(product_id) + '/')
 
     def get_product_list_by_name(self, product_name):
 #       Retrieves a product list by using the product name 
         #Note (search is made with Like.
 
-        return self._request('GET', 'products/?name=' + str(product_name))
+        return self._defectdojo_request.request('GET', 'products/?name=' + str(product_name))
 
 
     def create_product(self, name, description, prod_type):
@@ -411,7 +146,7 @@ class DefectDojoAPIv2(object):
             'prod_type': prod_type
         }
 
-        return self._request('POST', 'products/', data=data)
+        return self._defectdojo_request.request('POST', 'products/', data=data)
 
     def create_product(self, name, description, prod_type):
         """Creates a product with the given properties.
@@ -428,7 +163,7 @@ class DefectDojoAPIv2(object):
             'prod_type': prod_type
         }
 
-        return self._request('POST', 'products/', data=data)
+        return self._defectdojo_request.request('POST', 'products/', data=data)
 
 
     def set_product(self, product_id, name=None, description=None, prod_type=None):
@@ -452,13 +187,13 @@ class DefectDojoAPIv2(object):
         if prod_type:
             data['prod_type'] = prod_type
 
-        return self._request('PUT', 'products/' + str(product_id) + '/', data=data)
+        return self._defectdojo_request.request('PUT', 'products/' + str(product_id) + '/', data=data)
 
     def delete_product(self, product_id):
         """
         Deletes a product the given id
         """
-        return self._request('DELETE', 'products/' + str(product_id) + '/')
+        return self._defectdojo_request.request('DELETE', 'products/' + str(product_id) + '/')
 
 
     ###### Test API #######
@@ -484,7 +219,7 @@ class DefectDojoAPIv2(object):
         if test_type:
             params['test_type'] = test_type
 
-        return self._request('GET', 'tests/', params)
+        return self._defectdojo_request.request('GET', 'tests/', params)
 
     def get_test(self, test_id):
         """Retrieves a test using the given test id.
@@ -492,7 +227,7 @@ class DefectDojoAPIv2(object):
         :param test_id: Test identification.
 
         """
-        return self._request('GET', 'tests/' + str(test_id) + '/')
+        return self._defectdojo_request.request('GET', 'tests/' + str(test_id) + '/')
 
     def create_test(self, engagement_id, test_type, environment, target_start,
                     target_end, percent_complete=None, lead=None, title=None,
@@ -532,7 +267,7 @@ class DefectDojoAPIv2(object):
         if description:
             data['description'] = description
 
-        return self._request('POST', 'tests/', data=data)
+        return self._defectdojo_request.request('POST', 'tests/', data=data)
 
     def set_test(self, test_id, engagement_id=None, test_type=None,
         environment=None, target_start=None, target_end=None,
@@ -585,7 +320,7 @@ class DefectDojoAPIv2(object):
         if description:
             data['description'] = description
 
-        return self._request('PUT', 'tests/' + str(test_id) + '/', data=data)
+        return self._defectdojo_request.request('PUT', 'tests/' + str(test_id) + '/', data=data)
 
     ###### Test Types API #######
     def list_test_types(self, name=None, limit=20, offset=0):
@@ -607,7 +342,7 @@ class DefectDojoAPIv2(object):
         if offset:
             params['offset'] = offset
         
-        return self._request('GET', 'test_types/', params)
+        return self._defectdojo_request.request('GET', 'test_types/', params)
 
     
     def create_test_type(self, name, static_tool="False", dynamic_tool="False", active="True"):
@@ -628,7 +363,7 @@ class DefectDojoAPIv2(object):
             'active': active
         }
 
-        return self._request('POST', 'test_types/', data=data)
+        return self._defectdojo_request.request('POST', 'test_types/', data=data)
 
 
     def get_test_type(self, test_type_id):
@@ -637,7 +372,7 @@ class DefectDojoAPIv2(object):
         :param test_type_id: Test type id.
         """
 
-        return self._request('GET', 'test_types/' + str(test_type_id) + '/')
+        return self._defectdojo_request.request('GET', 'test_types/' + str(test_type_id) + '/')
 
     
     def set_test_type(self, test_type_id, name, static_tool="False", dynamic_tool="False", active="True"):
@@ -664,7 +399,7 @@ class DefectDojoAPIv2(object):
         if active:
             data['active'] = active
 
-        return self._request('PATCH', 'test_types/' + str(test_type_id) + '/', data=data)
+        return self._defectdojo_request.request('PATCH', 'test_types/' + str(test_type_id) + '/', data=data)
 
 
     
@@ -767,14 +502,14 @@ class DefectDojoAPIv2(object):
         if tags:
             params['tags'] = tags
 
-        return self._request('GET', 'findings/', params)
+        return self._defectdojo_request.request('GET', 'findings/', params)
 
     def get_finding(self, finding_id):
         """
         Retrieves a finding using the given finding id.
         :param finding_id: Finding identification.
         """
-        return self._request('GET', 'findings/' + str(finding_id) + '/')
+        return self._defectdojo_request.request('GET', 'findings/' + str(finding_id) + '/')
 
     def create_finding(self, title, description, severity, cwe, date, product_id, engagement_id,
         test_id, user_id, impact, active, verified, mitigation, references=None, build=None, line=0,
@@ -839,7 +574,7 @@ class DefectDojoAPIv2(object):
 	    'service': service
         }
 
-        return self._request('POST', 'findings/', data=data)
+        return self._defectdojo_request.request('POST', 'findings/', data=data)
 
     def set_finding(self, finding_id, product_id=None, engagement_id=None, test_id=None, title=None, description=None, severity=None, build=None,
         cwe=None, date=None, user_id=None, impact=None, active=None, verified=None,
@@ -920,7 +655,7 @@ class DefectDojoAPIv2(object):
         if build:
             data['build_id'] = build
 
-        return self._request('PUT', 'findings/' + str(finding_id) + '/', data=data)
+        return self._defectdojo_request.request('PUT', 'findings/' + str(finding_id) + '/', data=data)
 
     def delete_finding(self, finding_id):
 
@@ -930,7 +665,7 @@ class DefectDojoAPIv2(object):
 
         """
 
-        return self._request('DELETE', 'findings/' + str(finding_id))
+        return self._defectdojo_request.request('DELETE', 'findings/' + str(finding_id))
 
     ##### Build Details API #####
 
@@ -947,7 +682,7 @@ class DefectDojoAPIv2(object):
             'engagement': ('', engagement_id)
         }
 
-        return self._request(
+        return self._defectdojo_request.request(
             'POST', 'build_details/',
             files=data
         )
@@ -1000,7 +735,7 @@ class DefectDojoAPIv2(object):
           scan_date
         """
 
-        return self._request(
+        return self._defectdojo_request.request(
             'POST', 'import-scan/',
             files=data
         )
@@ -1036,7 +771,7 @@ class DefectDojoAPIv2(object):
         if auto_group_by:
             data['auto_group_by'] = (auto_group_by, '')
 
-        return self._request(
+        return self._defectdojo_request.request(
             'POST', 'reimport-scan/',
             files=data
         )
@@ -1060,14 +795,14 @@ class DefectDojoAPIv2(object):
         if username:
             params['username__contains'] = username
 
-        return self._request('GET', 'credentials/', params)
+        return self._defectdojo_request.request('GET', 'credentials/', params)
 
     def get_credential(self, cred_id, limit=20):
         """
         Retrieves a credential using the given credential id.
         :param credential_id: Credential identification.
         """
-        return self._request('GET', 'credentials/' + str(cred_id) + '/')
+        return self._defectdojo_request.request('GET', 'credentials/' + str(cred_id) + '/')
 
     ##### Credential Mapping API #####
 
@@ -1099,14 +834,14 @@ class DefectDojoAPIv2(object):
         if finding_id_in:
             params['finding__id__in'] = finding_id_in
 
-        return self._request('GET', 'credential_mappings/', params)
+        return self._defectdojo_request.request('GET', 'credential_mappings/', params)
 
     def get_credential_mapping(self, cred_mapping_id, limit=20):
         """
         Retrieves a credential using the given credential id.
         :param cred_mapping_id: Credential identification.
         """
-        return self._request('GET', 'credential_mappings/' + str(cred_mapping_id) + '/')
+        return self._defectdojo_request.request('GET', 'credential_mappings/' + str(cred_mapping_id) + '/')
 
     ##### App Analysis API #####
     def list_app_analysis(self, id=None, product_id=None, name=None, limit=20):
@@ -1132,7 +867,7 @@ class DefectDojoAPIv2(object):
         if name:
             params['name__icontains'] = language_name
 
-        return self._request('GET', 'app_analysis/', params)
+        return self._defectdojo_request.request('GET', 'app_analysis/', params)
 
     def create_app_analysis(self, product_id, user_id, name, confidence, version, icon, website):
         """
@@ -1150,14 +885,14 @@ class DefectDojoAPIv2(object):
             'website': website
         }
 
-        return self._request('POST', 'app_analysis/', data=data)
+        return self._defectdojo_request.request('POST', 'app_analysis/', data=data)
 
     def delete_app_analysis(self, id):
         """
         Deletes an app analysis using the given id.
         :param id: Language identification.
         """
-        return self._request('DELETE', 'app_analysis/' + str(id) + '/')
+        return self._defectdojo_request.request('DELETE', 'app_analysis/' + str(id) + '/')
 
     def delete_all_app_analysis_product(self, product_id):
         """
@@ -1195,7 +930,7 @@ class DefectDojoAPIv2(object):
         if language_name:
             params['language_type__language__icontains'] = language_name
 
-        return self._request('GET', 'languages/', params)
+        return self._defectdojo_request.request('GET', 'languages/', params)
 
     def create_language(self, product_id, user_id, files, code, blank, comment, language_type_id=None, language_name=None):
         """
@@ -1220,14 +955,14 @@ class DefectDojoAPIv2(object):
             'comment': comment
         }
 
-        return self._request('POST', 'languages/', data=data)
+        return self._defectdojo_request.request('POST', 'languages/', data=data)
 
     def delete_language(self, id):
         """
         Deletes a language using the given id.
         :param id: Language identification.
         """
-        return self._request('DELETE', 'languages/' + str(id) + '/')
+        return self._defectdojo_request.request('DELETE', 'languages/' + str(id) + '/')
 
     def delete_all_languages_product(self, product_id):
         """
@@ -1259,7 +994,7 @@ class DefectDojoAPIv2(object):
         if language_name:
             params['language__icontains'] = language_name
 
-        return self._request('GET', 'language_types/', params)
+        return self._defectdojo_request.request('GET', 'language_types/', params)
 
     ###### Tool API #######
 
@@ -1281,7 +1016,7 @@ class DefectDojoAPIv2(object):
         if name:
             params['name__contains'] = name
 
-        return self._request('GET', 'tool_types/', params)
+        return self._defectdojo_request.request('GET', 'tool_types/', params)
 
     def list_tools(self, resource_id=None, name=None, tool_type_id=None, url=None, name_icontains=None, limit=20):
         """Retrieves all the tool configurations.
@@ -1312,7 +1047,7 @@ class DefectDojoAPIv2(object):
         if name_icontains:
             params['name__icontains'] = name_icontains
 
-        return self._request('GET', 'tool_configurations/', params)
+        return self._defectdojo_request.request('GET', 'tool_configurations/', params)
 
     def list_tool_products(self, resource_id=None, url=None, name=None, tool_configuration_id=None,
         tool_project_id=None, product_id=None, limit=20):
@@ -1349,7 +1084,7 @@ class DefectDojoAPIv2(object):
         if product_id:
             params['product__id'] = product_id
 
-        return self._request('GET', 'tool_product_settings/', params)
+        return self._defectdojo_request.request('GET', 'tool_product_settings/', params)
 
     def list_jira_issues(self, finding_id=None, jira_key=None, limit=100, offset=0):
         """
@@ -1374,7 +1109,7 @@ class DefectDojoAPIv2(object):
         if offset:
             params['offset'] = offset
 
-        return self._request('GET', 'jira_finding_mappings/', params)
+        return self._defectdojo_request.request('GET', 'jira_finding_mappings/', params)
 
     def list_products_type(self, id=None, name=None, limit=100, offset=0):
         """
@@ -1399,134 +1134,4 @@ class DefectDojoAPIv2(object):
         if offset:
             params['offset'] = offset
 
-        return self._request('GET', 'product_types/', params)
-
-    # Utility
-
-    @staticmethod
-    def _build_list_params(param_name, key, values):
-        """Builds a list of POST parameters from a list or single value."""
-        params = {}
-        if hasattr(values, '__iter__'):
-            index = 0
-            for value in values:
-                params[str(param_name) + '[' + str(index) + '].' + str(key)] = str(value)
-                index += 1
-        else:
-            params[str(param_name) + '[0].' + str(key)] = str(values)
-        return params
-
-    def _request(self, method, url, params=None, data=None, files=None):
-        """Common handler for all HTTP requests."""
-        if not params:
-            params = {}
-
-        if data:
-            data = json.dumps(data)
-
-        headers = {
-            'User-Agent': self.user_agent,
-            'Authorization' : (("ApiKey "+ self.user + ":" + self.api_token) if (self.api_version=="v1") else ("Token " + self.api_token))
-        }
-
-        if not files:
-            headers['Accept'] = 'application/json'
-            headers['Content-Type'] = 'application/json'
-
-        if self.proxies:
-            proxies=self.proxies
-        else:
-            proxies = {}
-
-        try:
-            self.logger.debug("request:")
-            self.logger.debug(method + ' ' + url)
-            self.logger.debug("headers: " + str(headers))
-            self.logger.debug("params:" + str(params))
-            self.logger.debug("data:" + str(data))
-            self.logger.debug("files:" + str(files))
-
-            response = requests.request(method=method, url=self.host + url, params=params, data=data, files=files, headers=headers,
-                                        timeout=self.timeout, verify=self.verify_ssl, cert=self.cert, proxies=proxies)
-
-            self.logger.debug("response:")
-            self.logger.debug(response.status_code)
-            self.logger.debug(response.text)
-
-            try:
-                if response.status_code == 201: #Created new object
-                    try:
-                        object_id = response.headers["Location"].split('/')
-                        key_id = object_id[-2]
-                        data = int(key_id)
-                    except:
-                        data = response.json()
-
-                    return DefectDojoResponse(message="Upload complete", response_code=response.status_code, data=data, success=True)
-                elif response.status_code == 204: #Object updates
-                    return DefectDojoResponse(message="Object updated.", response_code=response.status_code, success=True)
-                elif response.status_code == 400: #Object not created
-                    return DefectDojoResponse(message="Error occured in API.", response_code=response.status_code, success=False, data=response.text)
-                elif response.status_code == 404: #Object not created
-                    return DefectDojoResponse(message="Object id does not exist.", response_code=response.status_code, success=False, data=response.text)
-                elif response.status_code == 401:
-                    return DefectDojoResponse(message="Unauthorized.", response_code=response.status_code, success=False, data=response.text)
-                elif response.status_code == 414:
-                    return DefectDojoResponse(message="Request-URI Too Large.", response_code=response.status_code, success=False)
-                elif response.status_code == 500:
-                    return DefectDojoResponse(message="An error 500 occured in the API.", response_code=response.status_code, success=False, data=response.text)
-                else:
-                    data = response.json()
-                    return DefectDojoResponse(message="Success", data=data, success=True, response_code=response.status_code)
-            except ValueError:
-                return DefectDojoResponse(message='JSON response could not be decoded.', response_code=response.status_code, success=False, data=response.text)
-        except requests.exceptions.SSLError:
-            self.logger.warning("An SSL error occurred.")
-            return DefectDojoResponse(message='An SSL error occurred.', response_code=response.status_code, success=False)
-        except requests.exceptions.ConnectionError:
-            self.logger.warning("A connection error occurred.")
-            return DefectDojoResponse(message='A connection error occurred.', response_code=response.status_code, success=False)
-        except requests.exceptions.Timeout:
-            self.logger.warning("The request timed out")
-            return DefectDojoResponse(message='The request timed out after ' + str(self.timeout) + ' seconds.', response_code=response.status_code,
-                                     success=False)
-        except requests.exceptions.RequestException as e:
-            self.logger.warning("There was an error while handling the request.")
-            self.logger.exception(e)
-            return DefectDojoResponse(message='There was an error while handling the request.', response_code=response.status_code, success=False)
-
-
-class DefectDojoResponse(object):
-    """
-    Container for all DefectDojo API responses, even errors.
-
-    """
-
-    def __init__(self, message, success, data=None, response_code=-1):
-        self.message = message
-        self.data = data
-        self.success = success
-        self.response_code = response_code
-        self.logger = logging.getLogger(LOGGER_NAME)
-
-    def __str__(self):
-        if self.data:
-            return str(self.data)
-        else:
-            return self.message
-
-    def id(self):
-        self.logger.debug("response_code" + str(self.response_code))
-        if self.response_code == 400: #Bad Request
-            raise ValueError('Object not created:' + json.dumps(self.data, sort_keys=True, indent=4, separators=(',', ': ')))
-        return int(self.data["id"])
-
-    def count(self):
-        return self.data["count"]
-
-    def data_json(self, pretty=False):
-        """Returns the data as a valid JSON string."""
-        if pretty:
-            return json.dumps(self.data, sort_keys=True, indent=4, separators=(',', ': '))
-        else:
-            return json.dumps(self.data)
+        return self._defectdojo_request.request('GET', 'product_types/', params)

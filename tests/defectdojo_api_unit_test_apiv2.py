@@ -4,7 +4,7 @@ as part of the OWASP DefectDojo and OWASP AppSec Pipeline Security projects
 
 Description: Tests the functionality of the DefectDojo API.
 """
-from defectdojo_api import defectdojo_apiv2 as defectdojo
+from defectdojo_api import defectdojo_api as defectdojo
 
 import unittest
 import os
