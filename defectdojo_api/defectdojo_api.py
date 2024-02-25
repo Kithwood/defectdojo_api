@@ -8,6 +8,20 @@ import defectdojo_enums
 from defectdojo_request import DefectDojoRequest
 from defectdojo_user import DefectDojoUser
 from defectdojo_engagement import DefectDojoEngagement
+from defectdojo_product import DefectDojoProduct
+from defectdojo_product_type import DefectDojoProductType
+from defectdojo_response import DefectDojoResponse
+
+# I'd say the important parts are really:
+# Product-types
+# Products
+# Engagements
+# Tests
+# Findings
+# Import-scan
+# reimport-scan
+# The rest aren't used all that often TBH.
+# If you've covered the above, we probably think about PR'ing your code into the current repo's master
 
 urllib3.add_stderr_logger()
 
@@ -18,6 +32,7 @@ LOGGER_NAME = "defectdojo_api"
 class DefectDojoAPI(object):
     """An API wrapper for DefectDojo."""
     _defectdojo_request = None
+
     def __init__(self :object, host :str, api_token :str, user :str, api_version :str ='v2', 
                  verify_ssl :bool =True, timeout :int =60, proxies :dict =None, 
                  user_agent :str =None, cert :str =None, debug :bool =False):
@@ -44,14 +59,16 @@ class DefectDojoAPI(object):
         self._defectdojo_request = DefectDojoRequest(version, host, api_token, user, api_version, verify_ssl, proxies, user_agent, timeout, cert, LOGGER_NAME)
         self.User = DefectDojoUser(self._defectdojo_request)
         self.Engagement = DefectDojoEngagement(self._defectdojo_request)
+        self.Product = DefectDojoProduct(self._defectdojo_request)
+        self.ProductType = DefectDojoProductType(self._defectdojo_request)
 
-    def version_url(self :object):
+    def version_url(self :object) -> str:
         """Returns the DefectDojo API version.
 
         """
         return self.api_version
 
-    def get_id_from_url(self :object, url :str):
+    def get_id_from_url(self :object, url :str) -> str:
         """Returns the ID from the DefectDojo API.
 
         :param url: URL returned by the API
@@ -59,7 +76,7 @@ class DefectDojoAPI(object):
         url = url.split('/')
         return url[len(url)-2]
 
-    def get_user_api_key(self :object, username :str, password :str):
+    def get_user_api_key(self :object, username :str, password :str) -> DefectDojoResponse:
         """Retrieves the user API key 
             is useful to import reports and findings from other tools, 
             since findings owner in API are set to the user calling the API
@@ -72,132 +89,9 @@ class DefectDojoAPI(object):
         }
         return self._defectdojo_request.request('POST', 'api-token-auth/', data=data)
 
-    ###### Product API #######
-    ##### ALL BELOW WILL MOVE TO PRODUCT OBJECT
-    def set_product_metadata(self :object, product_id :int, name :str =None, value :str =None):
-        """Add a custom field to a product.
-
-        :param product_id: int, Product ID.
-        :param name: (Optional) str, name for the metadata to set
-        :param value: (Optional) str, value for the metdata to set
-
-        """
-        data = {
-            'product': product_id,
-            'name': name,
-            'value': value
-        }
-        headers = {
-            'product_id': '{}'.format(product_id)
-        }
-
-        return self._defectdojo_request.request('POST', 'metadata/', data=data, custom_headers=headers)
-
-    def list_products(self, name=None, limit=200, offset=0):
-
-        """Retrieves all the products.
-
-        :param name: Search by product name.
-        :param limit: Number of records to return.
-        :param offset: The initial index from which to return the results.
-
-        """
-
-        params  = {}
-        if limit:
-            params['limit'] = limit
-
-        if offset:
-            params['offset'] = offset
-
-        if name:
-            params['name'] = name
-
-
-        return self._defectdojo_request.request('GET', 'products/', params)
-
-    def get_product(self, product_id):
-        """Retrieves a product using the given product id.
-
-        :param product_id: Product identification.
-
-        """
-        return self._defectdojo_request.request('GET', 'products/' + str(product_id) + '/')
-
-    def get_product_list_by_name(self, product_name):
-#       Retrieves a product list by using the product name 
-        #Note (search is made with Like.
-
-        return self._defectdojo_request.request('GET', 'products/?name=' + str(product_name))
-
-
-    def create_product(self, name, description, prod_type):
-        """Creates a product with the given properties.
-
-        :param name: Product name.
-        :param description: Product key id..
-        :param prod_type: Product type.
-
-        """
-
-        data = {
-            'name': name,
-            'description': description,
-            'prod_type': prod_type
-        }
-
-        return self._defectdojo_request.request('POST', 'products/', data=data)
-
-    def create_product(self, name, description, prod_type):
-        """Creates a product with the given properties.
-
-        :param name: Product name.
-        :param description: Product description..
-        :param prod_type: Product type.
-
-        """
-
-        data = {
-            'name': name,
-            'description': description,
-            'prod_type': prod_type
-        }
-
-        return self._defectdojo_request.request('POST', 'products/', data=data)
-
-
-    def set_product(self, product_id, name=None, description=None, prod_type=None):
-        """Updates a product with the given properties.
-
-        :param product_id: Product ID
-        :param name: Product name.
-        :param description: Product key id..
-        :param prod_type: Product type.
-
-        """
-
-        data = {}
-
-        if name:
-            data['name'] = name
-
-        if description:
-            data['description'] = description
-
-        if prod_type:
-            data['prod_type'] = prod_type
-
-        return self._defectdojo_request.request('PUT', 'products/' + str(product_id) + '/', data=data)
-
-    def delete_product(self, product_id):
-        """
-        Deletes a product the given id
-        """
-        return self._defectdojo_request.request('DELETE', 'products/' + str(product_id) + '/')
-
-
+    
     ###### Test API #######
-    def list_tests(self, engagement_id=None, test_type=None, limit=20, offset=0):
+    def list_tests(self :object, engagement_id :int=None, test_type :int=None, limit :int=20, offset :int=0):
         """Retrieves all the tests.
 
         :param name_contains: Search by product name.

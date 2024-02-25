@@ -13,7 +13,7 @@ class DefectDojoEngagement:
 
 
 
-    def list(self :object, **kwargs) -> DefectDojoResponse:    
+    def list(self :object, **kwargs :dict) -> DefectDojoResponse:    
         """ List the engagements that match the parameters requested
             :param kwargs: (Optional) keyword arguments that can be any of the following:
             
@@ -62,6 +62,7 @@ class DefectDojoEngagement:
                 if param:
                     params['offset'] = param
                     args_found+=1
+
             if args_found < num_args:                       
                 param = kwargs.get('product_id')
                 if param:
@@ -178,7 +179,7 @@ class DefectDojoEngagement:
 
         return self._defectdojo_request.request('GET', 'engagements/', params)
 
-    def create(self, target_start :date, target_end :date, product :int, **kwargs) -> DefectDojoResponse:
+    def create(self :object, target_start :date, target_end :date, product :int, **kwargs) -> DefectDojoResponse:
         """Creates an engagement with the given properties.
 
         :param target_start: date, engagement start date.
@@ -381,7 +382,7 @@ class DefectDojoEngagement:
 
         return self._defectdojo_request.request('POST', 'engagements/', data=data)
     
-    def get(self, engagement_id :int) -> DefectDojoResponse:
+    def get(self :object, engagement_id :int) -> DefectDojoResponse:
         """Retrieves an engagement using the given engagement id.
 
         :param engagement_id: Engagement identification.
@@ -389,7 +390,7 @@ class DefectDojoEngagement:
         """
         return self._defectdojo_request.request('GET', 'engagements/' + str(engagement_id) + '/')    
 
-    def update(self, id :int, **kwargs) -> DefectDojoResponse:
+    def update(self :object, id :int, **kwargs :dict) -> DefectDojoResponse:
 
         """Updates an engagement with the given properties.
 
@@ -475,32 +476,124 @@ class DefectDojoEngagement:
                     args_found+=1
             
             if args_found < num_args:
-                param - kwargs.get('target_start')
+                param = kwargs.get('target_start')
                 if param:
                     data['target_start'] = param.strftime("%Y%m%d")
                     args_found+=1
 
             if args_found < num_args:
-                param - kwargs.get('target_end')
+                param = kwargs.get('target_end')
                 if param:
                     data['target_end'] = param.strftime("%Y%m%d")
                     args_found+=1
+
+            if args_found < num_args:
+                param = kwargs.get('reason')
+                if param:
+                    data['reason'] = param
+                    args_found+=1
+            
+            if args_found < num_args:
+                param = kwargs.get('check_list')
+                if param:
+                    data['check_list'] = param
+                    args_found+=1
+            
+            if args_found < num_args:
+                param = kwargs.get('test_strategy')
+                if param:
+                    data['test_strategy'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('engagement_type')
+                if param:
+                    data['engagement_type'] = param.value
+
+            if args_found < num_args:
+                param = kwargs.get('build_id')
+                if param:
+                    data['build_id'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('commit_hash')
+                if param:
+                    data['commit_hash'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('branch_tag')
+                if param:
+                    data['branch_tag'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('build_server')
+                if param:
+                    data['build_server'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('source_code_management_server')
+                if param:
+                    data['source_code_management_server'] = param
+            
+            if args_found < num_args:
+                param = kwargs.get('orchestration_engine')
+                if param:
+                    data['orchestration_engine'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('tags')
+                if param:
+                    data['tags'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('tracker')
+                if param:
+                    data['tracker'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('threat_model')
+                if param:
+                    data['threat_model'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('api_test')
+                if param:
+                    data['api_test'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('pen_test')
+                if param:
+                    data['pen_test'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('requester')
+                if param:
+                    data['requester'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('preset')
+                if param:
+                    data['preset'] = param
+
+            if args_found < num_args:
+                param = kwargs.get('report_type')
+                if param:
+                    data['report_type'] = param
                     
         return self._defectdojo_request.request('PATCH', 'engagements/' + str(id) + '/', data=data)
 
-    def delete(self, id):
+    def delete(self :object, id :int) -> DefectDojoResponse:
         """Deletes an engagement with the given id
-        :param id: Enagement id.
+        :param id: int, enagement id
         """
 
         self._defectdojo_request.request('DELETE', f'engagements/{id}/')
 
-    def accept_risks(self, id, vulnerability_id, justification, accepted_by):
+    def accept_risks(self :object, id :int, vulnerability_id :int, justification :str, accepted_by :str) ->DefectDojoResponse:
         """Accepts the risks for the engagement with the given id
-        :param id: Engagement id.
-        :param vulnerability_id: An id of a vulnerability in a security advisory associated with this finding. Can be a Common Vulnerabilities and Exposure (CVE) or from other sources.
-        :param justification: Justification for accepting findings with this vulnerability id.
-        :param accepted_by: Name or email of person who accepts the risk.
+        :param id: int, Engagement id.
+        :param vulnerability_id: int, An id of a vulnerability in a security advisory associated with this finding. Can be a Common Vulnerabilities and Exposure (CVE) or from other sources.
+        :param justification: str, Justification for accepting findings with this vulnerability id.
+        :param accepted_by: str, Name or email of person who accepts the risk.
         """
         data = {
             'vulnerability_id': vulnerability_id,
@@ -510,17 +603,17 @@ class DefectDojoEngagement:
 
         self._defectdojo_request.request('POST', f'engagements/{id}/accept_risks/', data=data)
 
-    def close(self, id):
+    def close(self :object, id :int) -> DefectDojoResponse:
 
         """Closes an engagement with the given id.
-        :param id: Engagement id.
+        :param id: int, Engagement id.
         """
 
         self._defectdojo_request.request('POST', f'engagements/{id}/close/')
 
-    def get_complete_checklist(self, id):
+    def get_complete_checklist(self :object, id :int) -> DefectDojoResponse:
         """Gets complete checklist for engagement 
-        :param id: Engagement id.
+        :param id: int, Engagement id.
         """
 
         self._defectdojo_request.request('GET', f'engagements/{id}/complete_checklist/')

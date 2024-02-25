@@ -1,7 +1,13 @@
+from datetime import date
+from defectdojo_response import DefectDojoResponse
+from defectdojo_enums import DefectDojoEngagementStatus, DefectDojoEngagementOrder, DefectDojoEngagementType
+from defectdojo_request import DefectDojoRequest
+
 class DefectDojoUser:
 
     def __init__(self, request):
         self._defectdojo_request = request
+        
 
     def list(self, email=None, username=None, first_name=None, last_name=None, id=None, is_active=None, is_superuser=None, limit=20, offset=None):
         """Retrieves all the users.
