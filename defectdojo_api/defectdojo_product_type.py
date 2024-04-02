@@ -3,18 +3,24 @@ from defectdojo_response import DefectDojoResponse
 from defectdojo_enums import DefectDojoEngagementStatus, DefectDojoEngagementOrder, DefectDojoEngagementType
 from defectdojo_request import DefectDojoRequest
 from typing import List
+from dataclasses import dataclass
+import json
 
-class DefectDojoProductType:
+@dataclass
+class DefectDojoProductType():
+    name: str=""
+    id: int=0
+    critical_product: bool=False
+    key_product: bool=False
+    updated: date=None
+    created: date=None
+    description: str=None
+    members: dict=None
+    authorization_groups: str=None
+    _defectdojo_request :DefectDojoRequest = None
+    #_members_prefetch :List(DefectDojoProductTypeMember)=None
 
-    def __init__(self :object, request :DefectDojoRequest) -> None:
-        """ Initializes the defectdojoproducttype object
-        :param request: DefectDojoRequest this producttype will use for queries
-        """
-
-        self._defectdojo_request = request
-
-
-    def list(self :object, **kwargs :dict) -> DefectDojoResponse:
+    def list(self :object, **kwargs :dict) -> List[object]:
         """Retrieves all the product types.
            :param kwargs: (Optional) keyword arguments that can be any of the following:
             
@@ -88,7 +94,91 @@ class DefectDojoProductType:
                     params['prefetch'] = param
                     args_found+=1
 
-        return self._defectdojo_request.request('GET', 'product_types/', params)
+        dd_response = self._defectdojo_request.request('GET', 'product_types/', params)
+
+        dd_product_types = []
+        if dd_response.success:
+            data = json.loads(str(dd_response.data_json()))['results']
+            for item in data:
+                dd_product_types.append(DefectDojoProductType(**item))
+        
+        return dd_product_types
+
+    # def list(self :object, **kwargs :dict) -> DefectDojoResponse:
+    #     """Retrieves all the product types.
+    #        :param kwargs: (Optional) keyword arguments that can be any of the following:
+            
+    #         :param id: int, product type id
+    #         :param limit: int, maximum product types to return
+    #         :param offset: int, offset into the returned product types
+    #         :param name: str, name of the product types
+    #         :param critical_product: bool, True or False indicating the product type is a critical product
+    #         :param key_product: bool, True or False indicating the product type is a key product            
+    #         :param updated: date, when the product type was updated
+    #         :param created: date, when the product type was created
+    #         :param prefetch: list[str], list of fields for which to prefetch model instances, can be 'authorization_groups' and/or 'members'
+    #     """
+
+    #     params  = {}
+        
+    #     if kwargs:
+    #         num_args = len(kwargs)
+    #         args_found = 0
+
+    #         param = kwargs.get('id')
+    #         if param:
+    #             params['id'] = param
+    #             args_found+=1
+            
+    #         if args_found < num_args:    
+    #             param = kwargs.get('limit')
+    #             if param:
+    #                 params['limit'] = param
+    #                 args_found+=1
+
+    #         if args_found < num_args:   
+    #             param = kwargs.get('offset')
+    #             if param:
+    #                 params['offset'] = param
+    #                 args_found+=1
+
+    #         if args_found < num_args:   
+    #             param = kwargs.get('name')
+    #             if param:
+    #                 params['name'] = param
+    #                 args_found+=1
+            
+    #         if args_found < num_args:   
+    #             param = kwargs.get('critical_product')
+    #             if param:
+    #                 params['critical_product'] = param
+    #                 args_found+=1
+
+    #         if args_found < num_args:   
+    #             param = kwargs.get('key_product')
+    #             if param:
+    #                 params['key_product'] = param
+    #                 args_found+=1
+
+    #         if args_found < num_args:   
+    #             param = kwargs.get('updated')
+    #             if param:
+    #                 params['updated'] = param.strftime("%Y-%m-%d")
+    #                 args_found+=1
+
+    #         if args_found < num_args:   
+    #             param = kwargs.get('created')
+    #             if param:
+    #                 params['created'] = param.strftime("%Y-%m-%d")
+    #                 args_found+=1
+
+    #         if args_found < num_args:   
+    #             param = kwargs.get('prefetch')
+    #             if param:
+    #                 params['prefetch'] = param
+    #                 args_found+=1
+
+    #     return self._defectdojo_request.request('GET', 'product_types/', params)
 
     def get(self :object, id :int, prefetch :List[str]=None) -> DefectDojoResponse:
         """Retrieves a product type.

@@ -60,7 +60,8 @@ class DefectDojoAPI(object):
         self.User = DefectDojoUser(self._defectdojo_request)
         self.Engagement = DefectDojoEngagement(self._defectdojo_request)
         self.Product = DefectDojoProduct(self._defectdojo_request)
-        self.ProductType = DefectDojoProductType(self._defectdojo_request)
+        self.ProductType = DefectDojoProductType(_defectdojo_request=self._defectdojo_request)
+        
 
     def version_url(self :object) -> str:
         """Returns the DefectDojo API version.
