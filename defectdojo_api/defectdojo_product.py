@@ -32,7 +32,7 @@ class DefectDojoProduct:
 
     def list(self :object, name :str =None, limit :int =200, offset :int =0) -> DefectDojoResponse:
 
-        """Retrieves all the products.
+        """Retrieves all the products up to the limit starting at offset
 
         :param name: (Optional) str, Search by product name.
         :param limit: (Optional) int, Number of records to return.
